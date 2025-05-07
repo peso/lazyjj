@@ -128,20 +128,20 @@ fn main() -> Result<()> {
 
     // Setup environment
     let env = Env::new(path, args.revisions, jj_bin)?;
-    let mut commander = Commander::new(&env);
+    let commander = Commander::new(&env);
 
     if !args.ignore_jj_version {
         commander.check_jj_version()?;
     }
 
     // Setup app
-    let mut app = App::new(env.clone())?;
+    let mut app = App::new(env.clone(), commander)?;
 
     let mut terminal = setup_terminal()?;
     install_panic_hook();
 
     // Run app
-    let res = run_app(&mut terminal, &mut app, &mut commander);
+    let res = run_app(&mut terminal, &mut app);
     restore_terminal()?;
     res?;
 
@@ -151,7 +151,6 @@ fn main() -> Result<()> {
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
-    commander: &mut Commander,
 ) -> Result<()> {
     let mut start_time = Instant::now();
     loop {
@@ -162,9 +161,9 @@ fn run_app<B: Backend>(
             let update_span = trace_span!("update");
             terminal_draw_res = update_span.in_scope(|| -> Result<()> {
                 if let Some(component_action) =
-                    app.get_or_init_current_tab(commander)?.update(commander)?
+                    app.get_or_init_current_tab()?.update(&mut commander)?
                 {
-                    app.handle_action(component_action, commander)?;
+                    app.handle_action(component_action)?;
                 }
 
                 Ok(())
@@ -210,7 +209,7 @@ fn run_app<B: Backend>(
         start_time = Instant::now();
 
         let should_stop = input_spawn.in_scope(|| -> Result<bool> {
-            if app.input(event, commander)? {
+            if app.input(event)? {
                 return Ok(true);
             }
 

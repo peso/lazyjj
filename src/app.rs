@@ -37,6 +37,7 @@ impl Tab {
 
 pub struct App<'a> {
     pub env: Env,
+    pub commander: Commander,
     pub current_tab: Tab,
     pub log: Option<LogTab<'a>>,
     pub files: Option<FilesTab>,
@@ -46,9 +47,10 @@ pub struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    pub fn new(env: Env) -> Result<App<'a>> {
+    pub fn new(env: Env, commander: Commander) -> Result<App<'a>> {
         Ok(App {
             env,
+            commander,
             current_tab: Tab::Log,
             log: None,
             files: None,
@@ -60,9 +62,8 @@ impl<'a> App<'a> {
 
     pub fn get_or_init_current_tab(
         &mut self,
-        commander: &mut Commander,
     ) -> Result<&mut dyn Component> {
-        self.get_or_init_tab(commander, self.current_tab)
+        self.get_or_init_tab(self.current_tab)
     }
     pub fn get_current_tab(&mut self) -> Option<&mut dyn Component> {
         self.get_tab(self.current_tab)
@@ -70,7 +71,6 @@ impl<'a> App<'a> {
 
     pub fn set_next_tab_with_offset(
         &mut self,
-        commander: &mut Commander,
         offset: i64,
     ) -> Result<()> {
         let current_index = Tab::VALUES
@@ -80,21 +80,21 @@ impl<'a> App<'a> {
         let new_index =
             (current_index as i64 + Tab::VALUES.len() as i64 + offset) as usize % Tab::VALUES.len();
         let new_tab: Tab = Tab::VALUES[new_index];
-        self.set_tab(commander, new_tab)
+        self.set_tab(new_tab)
     }
 
-    pub fn set_tab(&mut self, commander: &mut Commander, tab: Tab) -> Result<()> {
+    pub fn set_tab(&mut self, tab: Tab) -> Result<()> {
         info!("Setting tab to {}", tab);
         self.current_tab = tab;
-
-        self.get_or_init_current_tab(commander)?.focus(commander)?;
+        let mut commander = self.commander.clone();
+        self.get_or_init_current_tab()?.focus(&mut commander)?;
         Ok(())
     }
 
-    pub fn get_log_tab(&mut self, commander: &mut Commander) -> Result<&mut LogTab<'a>> {
+    pub fn get_log_tab(&mut self) -> Result<&mut LogTab<'a>> {
         if self.log.is_none() {
             let span = info_span!("Initializing log tab");
-            let log_tab = span.in_scope(|| LogTab::new(commander))?;
+            let log_tab = span.in_scope(|| LogTab::new(&mut self.commander))?;
             self.log = Some(log_tab);
         }
 
@@ -103,12 +103,12 @@ impl<'a> App<'a> {
             .ok_or_else(|| anyhow!("Failed to get mutable reference to LogTab"))
     }
 
-    pub fn get_files_tab(&mut self, commander: &mut Commander) -> Result<&mut FilesTab> {
+    pub fn get_files_tab(&mut self) -> Result<&mut FilesTab> {
         if self.files.is_none() {
             let span = info_span!("Initializing files tab");
             let files_tab = span.in_scope(|| {
-                let current_head = commander.get_current_head()?;
-                FilesTab::new(commander, &current_head)
+                let current_head = self.commander.get_current_head()?;
+                FilesTab::new(&mut self.commander, &current_head)
             })?;
             self.files = Some(files_tab);
         }
@@ -120,11 +120,10 @@ impl<'a> App<'a> {
 
     pub fn get_bookmarks_tab(
         &mut self,
-        commander: &mut Commander,
     ) -> Result<&mut BookmarksTab<'a>> {
         if self.bookmarks.is_none() {
             let span = info_span!("Initializing bookmarks tab");
-            let bookmarks_tab = span.in_scope(|| BookmarksTab::new(commander))?;
+            let bookmarks_tab = span.in_scope(|| BookmarksTab::new(&mut self.commander))?;
             self.bookmarks = Some(bookmarks_tab);
         }
 
@@ -133,10 +132,10 @@ impl<'a> App<'a> {
             .ok_or_else(|| anyhow!("Failed to get mutable reference to BookmarksTab"))
     }
 
-    pub fn get_command_log_tab(&mut self, commander: &mut Commander) -> Result<&mut CommandLogTab> {
+    pub fn get_command_log_tab(&mut self) -> Result<&mut CommandLogTab> {
         if self.command_log.is_none() {
             let span = info_span!("Initializing command log tab");
-            let command_log_tab = span.in_scope(|| CommandLogTab::new(commander))?;
+            let command_log_tab = span.in_scope(|| CommandLogTab::new(&mut self.commander))?;
             self.command_log = Some(command_log_tab);
         }
 
@@ -147,14 +146,13 @@ impl<'a> App<'a> {
 
     pub fn get_or_init_tab(
         &mut self,
-        commander: &mut Commander,
         tab: Tab,
     ) -> Result<&mut dyn Component> {
         Ok(match tab {
-            Tab::Log => self.get_log_tab(commander)?,
-            Tab::Files => self.get_files_tab(commander)?,
-            Tab::Bookmarks => self.get_bookmarks_tab(commander)?,
-            Tab::CommandLog => self.get_command_log_tab(commander)?,
+            Tab::Log => self.get_log_tab()?,
+            Tab::Files => self.get_files_tab()?,
+            Tab::Bookmarks => self.get_bookmarks_tab()?,
+            Tab::CommandLog => self.get_command_log_tab()?,
         })
     }
 
@@ -182,37 +180,37 @@ impl<'a> App<'a> {
     pub fn handle_action(
         &mut self,
         component_action: ComponentAction,
-        commander: &mut Commander,
     ) -> Result<()> {
+        let mut commander = self.commander.clone();
         match component_action {
             ComponentAction::ViewFiles(head) => {
-                self.set_tab(commander, Tab::Files)?;
-                self.get_files_tab(commander)?.set_head(commander, &head)?;
+                self.set_tab(Tab::Files)?;
+                self.get_files_tab()?.set_head(&mut commander, &head)?;
             }
             ComponentAction::ViewLog(head) => {
-                self.get_log_tab(commander)?.set_head(commander, head);
-                self.set_tab(commander, Tab::Log)?;
+                self.get_log_tab()?.set_head(&mut commander, head);
+                self.set_tab(Tab::Log)?;
             }
             ComponentAction::ChangeHead(head) => {
-                self.get_files_tab(commander)?.set_head(commander, &head)?;
+                self.get_files_tab()?.set_head(&mut commander, &head)?;
             }
             ComponentAction::SetPopup(popup) => {
                 self.popup = popup;
             }
             ComponentAction::Multiple(component_actions) => {
                 for component_action in component_actions.into_iter() {
-                    self.handle_action(component_action, commander)?;
+                    self.handle_action(component_action)?;
                 }
             }
             ComponentAction::RefreshTab() => {
-                self.set_tab(commander, self.current_tab)?;
+                self.set_tab(self.current_tab)?;
                 match self.current_tab {
                     Tab::Log => {
-                        let head = commander.get_current_head()?;
-                        self.get_log_tab(commander)?.set_head(commander, head);
+                        let head = self.commander.get_current_head()?;
+                        self.get_log_tab()?.set_head(&mut commander, head);
                     }
                     Tab::CommandLog => {
-                        self.get_command_log_tab(commander)?.update(commander)?;
+                        self.get_command_log_tab()?.update(&mut commander)?;
                     }
                     _ => {}
                 };
@@ -222,11 +220,12 @@ impl<'a> App<'a> {
         Ok(())
     }
 
-    pub fn input(&mut self, event: Event, commander: &mut Commander) -> Result<bool> {
+    pub fn input(&mut self, event: Event) -> Result<bool> {
+        let mut commander = self.commander.clone();
         if let Some(popup) = self.popup.as_mut() {
-            match popup.input(commander, event.clone())? {
+            match popup.input(&mut commander, event.clone())? {
                 ComponentInputResult::HandledAction(component_action) => {
-                    self.handle_action(component_action, commander)?
+                    self.handle_action(component_action)?
                 }
                 ComponentInputResult::Handled => {}
                 ComponentInputResult::NotHandled => {
@@ -249,14 +248,14 @@ impl<'a> App<'a> {
                 }
             };
         } else if event == event::Event::FocusGained {
-            self.get_or_init_current_tab(commander)?.focus(commander)?;
+            self.get_or_init_current_tab()?.focus(&mut commander)?;
         } else {
             match self
-                .get_or_init_current_tab(commander)?
-                .input(commander, event.clone())?
+                .get_or_init_current_tab()?
+                .input(&mut commander, event.clone())?
             {
                 ComponentInputResult::HandledAction(component_action) => {
-                    self.handle_action(component_action, commander)?
+                    self.handle_action(component_action)?
                 }
                 ComponentInputResult::Handled => {}
                 ComponentInputResult::NotHandled => {
@@ -273,9 +272,9 @@ impl<'a> App<'a> {
                             //
                             // Tab switching
                             else if key.code == KeyCode::Char('l') {
-                                self.set_next_tab_with_offset(commander, 1)?;
+                                self.set_next_tab_with_offset(1)?;
                             } else if key.code == KeyCode::Char('h') {
-                                self.set_next_tab_with_offset(commander, -1)?;
+                                self.set_next_tab_with_offset(-1)?;
                             } else if let Some((_, tab)) =
                                 Tab::VALUES.iter().enumerate().find(|(i, _)| {
                                     key.code
@@ -286,7 +285,7 @@ impl<'a> App<'a> {
                                         )
                                 })
                             {
-                                self.set_tab(commander, *tab)?;
+                                self.set_tab(*tab)?;
                             }
                             // General jj command runner
                             else if key.code == KeyCode::Char(':') {

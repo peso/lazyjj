@@ -102,7 +102,7 @@ pub struct CommandLogItem {
 /// Struct used to interact with the jj cli using commanders.
 ///
 /// Handles arguments and recording of history.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Commander {
     pub env: Env,
     pub command_history: Arc<Mutex<Vec<CommandLogItem>>>,
