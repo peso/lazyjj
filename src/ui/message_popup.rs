@@ -9,7 +9,7 @@ use ratatui::{
 };
 use tui_confirm_dialog::PopupMessage;
 
-use crate::{ComponentInputResult, commander::Commander, ui::Component};
+use crate::{ComponentInputResult, ui::Component};
 
 pub struct MessagePopup<'a> {
     pub title: Title<'a>,
@@ -48,7 +48,7 @@ impl Component for MessagePopup<'_> {
         Ok(())
     }
 
-    fn input(&mut self, _commander: &mut Commander, _event: Event) -> Result<ComponentInputResult> {
+    fn input(&mut self, _event: Event) -> Result<ComponentInputResult> {
         Ok(ComponentInputResult::NotHandled)
     }
 }

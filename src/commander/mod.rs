@@ -105,6 +105,7 @@ pub struct CommandLogItem {
 #[derive(Clone, Debug)]
 pub struct Commander {
     pub env: Env,
+    /// Global list of commands. Shared between clones.
     pub command_history: Arc<Mutex<Vec<CommandLogItem>>>,
 
     // Used for testing

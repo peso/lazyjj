@@ -149,11 +149,9 @@ impl CommandLogTab {
 }
 
 impl Component for CommandLogTab {
-    fn focus(&mut self, commander: &mut Commander) -> Result<()> {
-        let command_history = commander.command_history.lock().unwrap().clone();
-        let selected_index = command_history.first().map(|_| 0);
+    fn focus(&mut self) -> Result<()> {
+        let selected_index = self.command_history.first().map(|_| 0);
         self.commands_list_state.select(selected_index);
-        self.command_history = command_history;
         Ok(())
     }
 
@@ -249,7 +247,7 @@ impl Component for CommandLogTab {
         Ok(())
     }
 
-    fn input(&mut self, _commander: &mut Commander, event: Event) -> Result<ComponentInputResult> {
+    fn input(&mut self, event: Event) -> Result<ComponentInputResult> {
         if let Event::Key(key) = event {
             if key.kind != KeyEventKind::Press {
                 return Ok(ComponentInputResult::Handled);

@@ -26,6 +26,8 @@ use ratatui::{
 
 /// Files tab. Shows files in selected change in main panel and selected file diff in details panel
 pub struct FilesTab {
+    commander: Commander,
+
     head: Head,
     is_current_head: bool,
 
@@ -59,7 +61,7 @@ fn get_current_file_index(
 
 impl FilesTab {
     #[instrument(level = "trace", skip(commander))]
-    pub fn new(commander: &mut Commander, head: &Head) -> Result<Self> {
+    pub fn new(commander: Commander, head: &Head) -> Result<Self> {
         let head = head.clone();
         let is_current_head = head == commander.get_current_head()?;
 
@@ -85,8 +87,11 @@ impl FilesTab {
             current_file.as_ref(),
             files_output.as_ref(),
         ));
+        let config = commander.env.config.clone();
 
         Ok(Self {
+            commander,
+
             head,
             is_current_head,
 
@@ -101,22 +106,22 @@ impl FilesTab {
             diff_format,
             diff_panel: DetailsPanel::new(),
 
-            config: commander.env.config.clone(),
+            config,
         })
     }
 
-    pub fn set_head(&mut self, commander: &mut Commander, head: &Head) -> Result<()> {
+    pub fn set_head(&mut self, head: &Head) -> Result<()> {
         self.head = head.clone();
-        self.is_current_head = self.head == commander.get_current_head()?;
+        self.is_current_head = self.head == self.commander.get_current_head()?;
 
-        self.refresh_files(commander)?;
+        self.refresh_files()?;
         self.file = self
             .files_output
             .as_ref()
             .ok()
             .and_then(|files_output| files_output.first())
             .map(|file| file.to_owned());
-        self.refresh_diff(commander)?;
+        self.refresh_diff()?;
 
         Ok(())
     }
@@ -125,18 +130,18 @@ impl FilesTab {
         get_current_file_index(self.file.as_ref(), self.files_output.as_ref())
     }
 
-    pub fn refresh_files(&mut self, commander: &mut Commander) -> Result<()> {
-        self.files_output = commander.get_files(&self.head);
-        self.conflicts_output = commander.get_conflicts(&self.head.commit_id)?;
+    pub fn refresh_files(&mut self) -> Result<()> {
+        self.files_output = self.commander.get_files(&self.head);
+        self.conflicts_output = self.commander.get_conflicts(&self.head.commit_id)?;
         Ok(())
     }
 
-    pub fn refresh_diff(&mut self, commander: &mut Commander) -> Result<()> {
+    pub fn refresh_diff(&mut self) -> Result<()> {
         self.diff_output = self
             .file
             .as_ref()
             .map(|current_file| {
-                commander.get_file_diff(&self.head, current_file, &self.diff_format, true)
+                self.commander.get_file_diff(&self.head, current_file, &self.diff_format, true)
             })
             .map_or(Ok(None), |r| {
                 r.map(|diff| diff.map(|diff| tabs_to_spaces(&diff)))
@@ -145,15 +150,15 @@ impl FilesTab {
         Ok(())
     }
 
-    pub fn untrack_file(&mut self, commander: &mut Commander) -> Result<()> {
+    pub fn untrack_file(&self) -> Result<()> {
         self.file
             .as_ref()
-            .map(|current_file| commander.untrack_file(current_file))
+            .map(|current_file| self.commander.untrack_file(current_file))
             .transpose()?;
         Ok(())
     }
 
-    fn scroll_files(&mut self, commander: &mut Commander, scroll: isize) -> Result<()> {
+    fn scroll_files(&mut self, scroll: isize) -> Result<()> {
         if let Ok(files) = self.files_output.as_ref() {
             let current_file_index = self.get_current_file_index();
             let next_file = match current_file_index {
@@ -167,7 +172,7 @@ impl FilesTab {
             .map(|x| x.to_owned());
             if let Some(next_file) = next_file {
                 self.file = Some(next_file.to_owned());
-                self.refresh_diff(commander)?;
+                self.refresh_diff()?;
             }
         }
         Ok(())
@@ -175,11 +180,11 @@ impl FilesTab {
 }
 
 impl Component for FilesTab {
-    fn focus(&mut self, commander: &mut Commander) -> Result<()> {
-        self.is_current_head = self.head == commander.get_current_head()?;
-        self.head = commander.get_head_latest(&self.head)?;
-        self.refresh_files(commander)?;
-        self.refresh_diff(commander)?;
+    fn focus(&mut self) -> Result<()> {
+        self.is_current_head = self.head == self.commander.get_current_head()?;
+        self.head = self.commander.get_head_latest(&self.head)?;
+        self.refresh_files()?;
+        self.refresh_diff()?;
         Ok(())
     }
 
@@ -316,7 +321,8 @@ impl Component for FilesTab {
         Ok(())
     }
 
-    fn input(&mut self, commander: &mut Commander, event: Event) -> Result<ComponentInputResult> {
+    fn input(&mut self, event: Event) -> Result<ComponentInputResult> {
+        let commander = &self.commander;
         if let Event::Key(key) = event {
             if key.kind != KeyEventKind::Press {
                 return Ok(ComponentInputResult::Handled);
@@ -327,24 +333,23 @@ impl Component for FilesTab {
             }
 
             match key.code {
-                KeyCode::Char('j') | KeyCode::Down => self.scroll_files(commander, 1)?,
-                KeyCode::Char('k') | KeyCode::Up => self.scroll_files(commander, -1)?,
+                KeyCode::Char('j') | KeyCode::Down => self.scroll_files( 1)?,
+                KeyCode::Char('k') | KeyCode::Up => self.scroll_files( -1)?,
                 KeyCode::Char('J') => {
-                    self.scroll_files(commander, self.files_height as isize / 2)?;
+                    self.scroll_files( self.files_height as isize / 2)?;
                 }
                 KeyCode::Char('K') => {
                     self.scroll_files(
-                        commander,
                         (self.files_height as isize / 2).saturating_neg(),
                     )?;
                 }
                 KeyCode::Char('w') => {
                     self.diff_format = self.diff_format.get_next(self.config.diff_tool());
-                    self.refresh_diff(commander)?;
+                    self.refresh_diff()?;
                 }
                 KeyCode::Char('x') => {
                     // this works even for deleted files because jj doesn't return error in that case
-                    if self.untrack_file(commander).is_err() {
+                    if self.untrack_file().is_err() {
                         return Ok(ComponentInputResult::HandledAction(
                             ComponentAction::SetPopup(Some(Box::new(MessagePopup {
                                 title: "Can't untrack file".into(),
@@ -353,16 +358,16 @@ impl Component for FilesTab {
                             }))),
                         ));
                     }
-                    self.set_head(commander, &commander.get_current_head()?)?;
+                    self.set_head(&commander.get_current_head()?)?;
                 }
                 KeyCode::Char('R') | KeyCode::F(5) => {
                     self.head = commander.get_head_latest(&self.head)?;
-                    self.refresh_files(commander)?;
-                    self.refresh_diff(commander)?;
+                    self.refresh_files()?;
+                    self.refresh_diff()?;
                 }
                 KeyCode::Char('@') => {
                     let head = &commander.get_current_head()?;
-                    self.set_head(commander, head)?;
+                    self.set_head(head)?;
                 }
                 KeyCode::Char('?') => {
                     return Ok(ComponentInputResult::HandledAction(

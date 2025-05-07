@@ -161,7 +161,7 @@ fn run_app<B: Backend>(
             let update_span = trace_span!("update");
             terminal_draw_res = update_span.in_scope(|| -> Result<()> {
                 if let Some(component_action) =
-                    app.get_or_init_current_tab()?.update(&mut commander)?
+                    app.get_or_init_current_tab()?.update()?
                 {
                     app.handle_action(component_action)?;
                 }

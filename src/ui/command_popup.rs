@@ -18,12 +18,14 @@ use crate::{
 };
 
 pub struct CommandPopup<'a> {
+    commander: Commander,
     command_textarea: TextArea<'a>,
 }
 
 impl CommandPopup<'_> {
-    pub fn new() -> Self {
+    pub fn new(commander: Commander) -> Self {
         Self {
+            commander,
             command_textarea: TextArea::new(vec![]),
         }
     }
@@ -67,9 +69,9 @@ impl Component for CommandPopup<'_> {
 
     fn input(
         &mut self,
-        commander: &mut Commander,
         event: Event,
     ) -> anyhow::Result<ComponentInputResult> {
+        let commander = &self.commander;
         if let Event::Key(key) = event {
             match key.code {
                 KeyCode::Enter => {

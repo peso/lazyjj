@@ -15,7 +15,7 @@ use std::time::Instant;
 use crate::{
     ComponentInputResult,
     app::{App, Tab},
-    commander::{Commander, log::Head},
+    commander::log::Head,
 };
 use anyhow::Result;
 use ratatui::{
@@ -38,17 +38,17 @@ pub enum ComponentAction {
 
 pub trait Component {
     // Called when switching to tab
-    fn focus(&mut self, _commander: &mut Commander) -> Result<()> {
+    fn focus(&mut self) -> Result<()> {
         Ok(())
     }
 
-    fn update(&mut self, _commander: &mut Commander) -> Result<Option<ComponentAction>> {
+    fn update(&mut self) -> Result<Option<ComponentAction>> {
         Ok(None)
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()>;
 
-    fn input(&mut self, commander: &mut Commander, event: Event) -> Result<ComponentInputResult>;
+    fn input(&mut self, event: Event) -> Result<ComponentInputResult>;
 }
 
 pub fn ui(f: &mut Frame, app: &mut App) -> Result<()> {
