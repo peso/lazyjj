@@ -14,6 +14,8 @@ pub struct DetailsPanel {
     scroll: u16,
     height: u16,
     lines: u16,
+    /// Line where drag motion started
+    drag_origin: f32,
     wrap: bool,
 }
 
@@ -32,6 +34,9 @@ pub enum DetailsPanelEvent {
     ScrollUpHalfPage,
     ScrollDownPage,
     ScrollUpPage,
+    DragBegin(/* rel_line */ f32),
+    DragUpdate(/* rel_line */ f32),
+    DragEnd(/* rel_line */ f32),
     ToggleWrap,
 }
 
@@ -110,6 +115,7 @@ impl DetailsPanel {
             scroll: 0,
             height: 0,
             lines: 0,
+            drag_origin: 0.0,
             wrap: true,
         }
     }
@@ -145,6 +151,20 @@ impl DetailsPanel {
         self.scroll_to(self.scroll.saturating_add_signed(scroll as i16))
     }
 
+    /// Mark the line where dragging starts. Note that rel_line_no must grow 1
+    /// for every scroll line, but it does not matter if scroll=0 is where rel_line_no==0
+    ///
+    pub fn drag_base(&mut self, rel_line_no: f32) {
+        self.drag_origin = rel_line_no * (self.lines as f32) - (self.scroll as f32);
+    }
+
+    /// Scroll relative to drag_base.
+    pub fn drag_move_to(&mut self, rel_line_no: f32) {
+        let drag_target_line = rel_line_no * (self.lines as f32) - self.drag_origin;
+        let scroll_target_line = drag_target_line.clamp(0.0, self.lines.into());
+        self.scroll_to(scroll_target_line as u16);
+    }
+
     pub fn handle_event(&mut self, details_panel_event: DetailsPanelEvent) {
         match details_panel_event {
             DetailsPanelEvent::ScrollDown => self.scroll(1),
@@ -155,6 +175,9 @@ impl DetailsPanel {
             }
             DetailsPanelEvent::ScrollDownPage => self.scroll(self.height as isize),
             DetailsPanelEvent::ScrollUpPage => self.scroll((self.height as isize).saturating_neg()),
+            DetailsPanelEvent::DragBegin(rel_line) => self.drag_base(rel_line),
+            DetailsPanelEvent::DragUpdate(rel_line) => self.drag_move_to(rel_line),
+            DetailsPanelEvent::DragEnd(rel_line) => self.drag_move_to(rel_line),
             DetailsPanelEvent::ToggleWrap => self.wrap = !self.wrap,
         }
     }

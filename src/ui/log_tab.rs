@@ -3,7 +3,7 @@
 use ansi_to_tui::IntoText;
 use anyhow::Result;
 use ratatui::{
-    crossterm::event::{Event, KeyEventKind, MouseEvent, MouseEventKind},
+    crossterm::event::{Event, KeyEventKind, MouseButton, MouseEvent, MouseEventKind},
     layout::Rect,
     prelude::*,
     widgets::*,
@@ -868,6 +868,7 @@ impl Component for LogTab<'_> {
                 None
             };
             let panel = find_panel();
+            let relative_doc_line = mouse_event.row as f32 / (self.panel_rect[1].height as f32);
             // Execute command dependent on panel and event kind
             const LOG_PANEL: Option<usize> = Some(0);
             const DETAILS_PANEL: Option<usize> = Some(1);
@@ -887,6 +888,18 @@ impl Component for LogTab<'_> {
                     self.head_panel.handle_event(DetailsPanelEvent::ScrollDown);
                     self.head_panel.handle_event(DetailsPanelEvent::ScrollDown);
                     self.head_panel.handle_event(DetailsPanelEvent::ScrollDown);
+                }
+                (DETAILS_PANEL, MouseEventKind::Down(MouseButton::Left)) => {
+                    self.head_panel
+                        .handle_event(DetailsPanelEvent::DragBegin(relative_doc_line));
+                }
+                (DETAILS_PANEL, MouseEventKind::Drag(MouseButton::Left)) => {
+                    self.head_panel
+                        .handle_event(DetailsPanelEvent::DragUpdate(relative_doc_line));
+                }
+                (DETAILS_PANEL, MouseEventKind::Up(MouseButton::Left)) => {
+                    self.head_panel
+                        .handle_event(DetailsPanelEvent::DragEnd(relative_doc_line));
                 }
                 _ => {} // Handle other mouse events if necessary
             }
