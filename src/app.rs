@@ -1,16 +1,23 @@
+use std::path::PathBuf;
+
+use anyhow::{Result, anyhow};
+use core::fmt;
+use ratatui::crossterm::{
+    self,
+    event::{Event as TermEvent, KeyCode, KeyModifiers},
+};
+use tracing::{info, info_span, trace};
+
 use crate::{
     ComponentInputResult,
     commander::Commander,
     env::Env,
+    event::{AppEvent, EventSource},
     ui::{
         Component, ComponentAction, bookmarks_tab::BookmarksTab, command_log_tab::CommandLogTab,
         command_popup::CommandPopup, files_tab::FilesTab, log_tab::LogTab,
     },
 };
-use anyhow::{Result, anyhow};
-use core::fmt;
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use tracing::{info, info_span};
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum Tab {
@@ -36,14 +43,20 @@ impl Tab {
 }
 
 pub struct App<'a> {
+    // application environment
     pub env: Env,
     pub commander: Commander,
+
+    // user interace
     pub current_tab: Tab,
     pub log: Option<LogTab<'a>>,
     pub files: Option<FilesTab>,
     pub bookmarks: Option<BookmarksTab<'a>>,
     pub command_log: Option<CommandLogTab>,
     pub popup: Option<Box<dyn Component>>,
+
+    // event handling
+    event_source: EventSource,
 }
 
 impl<'a> App<'a> {
@@ -51,12 +64,15 @@ impl<'a> App<'a> {
         Ok(App {
             env,
             commander,
+
             current_tab: Tab::Log,
             log: None,
             files: None,
             bookmarks: None,
             command_log: None,
             popup: None,
+
+            event_source: EventSource::new(),
         })
     }
 
@@ -218,7 +234,28 @@ impl<'a> App<'a> {
         Ok(())
     }
 
-    pub fn input(&mut self, event: Event) -> Result<bool> {
+    /// Set up threads that capture input and send AppEvents
+    pub fn launch_input_channel(&mut self) {
+        let jj_folder = PathBuf::from(&self.env.root.clone())
+            .join(".jj")
+            .join("working_copy");
+        self.event_source.launch_watcher(jj_folder);
+        self.event_source.launch_user_input();
+    }
+
+    /// Recieve an AppEvent if one is waiting.
+    pub fn try_recv_app_event(&mut self) -> Option<AppEvent> {
+        self.event_source.try_recv()
+    }
+
+    /// Process an AppEvent
+    pub fn input(&mut self, event: AppEvent) -> Result<bool> {
+        let AppEvent::UserInput(event) = event else {
+            // Trigger update of jj data - simulate focus gained
+            trace!("no-event trigger update of jj data");
+            self.get_or_init_current_tab()?.focus()?;
+            return Ok(false); // do not terminate the app
+        };
         if let Some(popup) = self.popup.as_mut() {
             match popup.input(event.clone())? {
                 ComponentInputResult::HandledAction(component_action) => {
@@ -226,8 +263,8 @@ impl<'a> App<'a> {
                 }
                 ComponentInputResult::Handled => {}
                 ComponentInputResult::NotHandled => {
-                    if let Event::Key(key) = event {
-                        if key.kind == event::KeyEventKind::Press {
+                    if let TermEvent::Key(key) = event {
+                        if key.kind == crossterm::event::KeyEventKind::Press {
                             // Close
                             if matches!(
                                 key.code,
@@ -244,7 +281,7 @@ impl<'a> App<'a> {
                     }
                 }
             };
-        } else if event == event::Event::FocusGained {
+        } else if event == TermEvent::FocusGained {
             self.get_or_init_current_tab()?.focus()?;
         } else {
             match self
@@ -256,8 +293,8 @@ impl<'a> App<'a> {
                 }
                 ComponentInputResult::Handled => {}
                 ComponentInputResult::NotHandled => {
-                    if let Event::Key(key) = event {
-                        if key.kind == event::KeyEventKind::Press {
+                    if let TermEvent::Key(key) = event {
+                        if key.kind == crossterm::event::KeyEventKind::Press {
                             // Close
                             if key.code == KeyCode::Char('q')
                                 || (key.modifiers.contains(KeyModifiers::CONTROL)
