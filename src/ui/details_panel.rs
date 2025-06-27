@@ -90,6 +90,9 @@ impl<'a> DetailsPanelRenderContext<'a> {
         // render content and border
         f.render_widget(paragraph, area);
 
+        // render file context on top of first line
+        render_file_context(f, content_text, self.panel.scroll.into(), paragraph_area);
+
         // render scrollbar on top of border
         if self.panel.lines > paragraph_area.height {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
@@ -109,6 +112,45 @@ impl<'a> DetailsPanelRenderContext<'a> {
     }
 }
 
+/// render file context on top of first line
+fn render_file_context(f: &mut ratatui::prelude::Frame<'_>, text: &Text, scroll: usize, area: Rect) {
+    if area.height < 1 {
+        return;
+    }
+    /*
+    // Find first char of a ratatui Line
+    fn first_char_of_line_1(line: &Line) -> Option<char> {
+        line.spans().map(|span|
+            span.content.chars().next()? // First char of span
+        ).next() // Get the first result only
+    }
+    */
+    // Find first char of a ratatui Line
+    fn first_char_of_line(line: &Line) -> Option<char> {
+        // Spans may have no chars, so we need to try them all
+        for span in line.iter() {
+            for c in span.content.chars() {
+                // Return first char found
+                return Some(c);
+            }
+        }
+        None
+    }
+    // Find the last line that has a letter in first column, before scroll window
+    let last_header_line = text
+        .iter() // iterate over lines
+        .take(scroll+1) // Only lines before and first line in scroll window
+        .filter(|&line| // and only lines that start with a letter
+            first_char_of_line(line)
+            .filter(|&ch| ch.is_alphabetic()) != None)
+        .last();
+    // If such a line was found, render it as a header on the top row
+    if let Some(header_line) = last_header_line {
+        let paragraph = Paragraph::new(Text::from(header_line.clone()));
+        f.render_widget(paragraph, area);
+    }
+}
+
 impl DetailsPanel {
     pub fn new() -> Self {
         Self {
@@ -124,7 +166,7 @@ impl DetailsPanel {
         DetailsPanelRenderContext::new(self)
     }
 
-    /// Render the parent into the area.
+    /// Render the content as a Paragraph
     pub fn render<'a, T>(&mut self, content: T, area: Rect) -> Paragraph<'a>
     where
         T: Into<Text<'a>>,
