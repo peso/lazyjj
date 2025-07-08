@@ -123,12 +123,25 @@ impl Config {
     }
 }
 
+/// Read-only acces to debug configuration.
+/// The values are set before app start.
+#[derive(Debug, Clone, Default)]
+pub struct Debug {
+    /// Is tracing to Chrome enabled
+    pub trace: bool,
+    /// Is log to file enabled
+    pub log: bool,
+    /// Is ui tab Command Log and frame rate display enabled
+    pub internal_ui: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct Env {
     pub config: Config,
     pub root: String,
     pub default_revset: Option<String>,
     pub jj_bin: String,
+    pub debug: Debug,
 }
 
 impl Env {
@@ -220,6 +233,7 @@ impl Env {
             config,
             default_revset,
             jj_bin,
+            debug: Debug::default(),
         })
     }
 }
