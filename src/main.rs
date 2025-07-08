@@ -38,12 +38,7 @@ mod event;
 mod keybinds;
 mod ui;
 
-use crate::{
-    app::App,
-    commander::Commander,
-    env::Env,
-    ui::{ComponentAction, ui},
-};
+use crate::{app::App, commander::Commander, env::Env, ui::ComponentAction};
 
 /// Command line arguments
 #[derive(Parser, Debug)]
@@ -64,6 +59,10 @@ struct Args {
     /// Do not exit if jj version check fails
     #[arg(long)]
     ignore_jj_version: bool,
+
+    /// Enable debugging UI
+    #[arg(long)]
+    debug_ui: bool,
 }
 
 fn main() -> Result<()> {
@@ -127,7 +126,10 @@ fn main() -> Result<()> {
     }
 
     // Setup environment
-    let env = Env::new(path, args.revisions, jj_bin)?;
+    let mut env = Env::new(path, args.revisions, jj_bin)?;
+    env.debug.trace = should_trace;
+    env.debug.log = should_log;
+    env.debug.internal_ui = args.debug_ui;
     let commander = Commander::new(&env);
 
     if !args.ignore_jj_version {
@@ -197,9 +199,10 @@ fn draw_app<B: Backend>(
 
         let draw_span = trace_span!("draw");
         terminal_draw_res = draw_span.in_scope(|| -> Result<()> {
-            ui(f, app)?;
+            ui::draw_app(f, app)?;
 
-            {
+            // Show ms used for drawing, if command log enabled
+            if app.env.debug.internal_ui {
                 let paragraph = Paragraph::new(format!("{}ms", start_time.elapsed().as_millis()))
                     .alignment(Alignment::Right);
                 let position = Rect {

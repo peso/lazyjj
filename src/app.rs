@@ -38,16 +38,13 @@ impl fmt::Display for Tab {
     }
 }
 
-impl Tab {
-    pub const VALUES: [Self; 4] = [Tab::Log, Tab::Files, Tab::Bookmarks, Tab::CommandLog];
-}
-
 pub struct App<'a> {
     // application environment
     pub env: Env,
     pub commander: Commander,
 
     // user interace
+    pub tab_sequence: Vec<Tab>,
     pub current_tab: Tab,
     pub log: Option<LogTab<'a>>,
     pub files: Option<FilesTab>,
@@ -61,10 +58,16 @@ pub struct App<'a> {
 
 impl<'a> App<'a> {
     pub fn new(env: Env, commander: Commander) -> Result<App<'a>> {
+        let mut tab_sequence: Vec<Tab> = vec![Tab::Log, Tab::Files, Tab::Bookmarks];
+        if env.debug.internal_ui {
+            tab_sequence.push(Tab::CommandLog);
+        }
+
         Ok(App {
             env,
             commander,
 
+            tab_sequence,
             current_tab: Tab::Log,
             log: None,
             files: None,
@@ -89,13 +92,14 @@ impl<'a> App<'a> {
         &mut self,
         offset: i64,
     ) -> Result<()> {
-        let current_index = Tab::VALUES
+        let current_index = self
+            .tab_sequence
             .iter()
             .position(|&t| t == self.current_tab)
-            .unwrap();
-        let new_index =
-            (current_index as i64 + Tab::VALUES.len() as i64 + offset) as usize % Tab::VALUES.len();
-        let new_tab: Tab = Tab::VALUES[new_index];
+            .unwrap_or(0);
+        let new_index = (current_index as i64 + self.tab_sequence.len() as i64 + offset) as usize
+            % self.tab_sequence.len();
+        let new_tab: Tab = self.tab_sequence[new_index];
         self.set_tab(new_tab)
     }
 
@@ -315,7 +319,7 @@ impl<'a> App<'a> {
                             } else if key.code == KeyCode::Char('h') {
                                 self.set_next_tab_with_offset(-1)?;
                             } else if let Some((_, tab)) =
-                                Tab::VALUES.iter().enumerate().find(|(i, _)| {
+                                self.tab_sequence.iter().enumerate().find(|(i, _)| {
                                     key.code
                                         == KeyCode::Char(
                                             char::from_digit((*i as u32) + 1u32, 10).expect(

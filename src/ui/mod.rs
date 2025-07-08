@@ -10,11 +10,9 @@ pub mod message_popup;
 pub mod styles;
 pub mod utils;
 
-use std::time::Instant;
-
 use crate::{
     ComponentInputResult,
-    app::{App, Tab},
+    app::App,
     commander::log::Head,
 };
 use anyhow::Result;
@@ -51,9 +49,7 @@ pub trait Component {
     fn input(&mut self, event: Event) -> Result<ComponentInputResult>;
 }
 
-pub fn ui(f: &mut Frame, app: &mut App) -> Result<()> {
-    let start_time = Instant::now();
-
+pub fn draw_app(f: &mut Frame, app: &mut App) -> Result<()> {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(3), Constraint::Min(1)])
@@ -65,8 +61,9 @@ pub fn ui(f: &mut Frame, app: &mut App) -> Result<()> {
         .split(chunks[0]);
 
     {
+        // TODO change tab list when Command Log disabled
         let tabs = Tabs::new(
-            Tab::VALUES
+            app.tab_sequence
                 .iter()
                 .enumerate()
                 .map(|(i, tab)| format!("[{}] {}", i + 1, tab)),
@@ -78,7 +75,7 @@ pub fn ui(f: &mut Frame, app: &mut App) -> Result<()> {
         )
         .highlight_style(Style::default().bg(app.env.config.highlight_color()))
         .select(
-            Tab::VALUES
+            app.tab_sequence
                 .iter()
                 .position(|tab| tab == &app.current_tab)
                 .unwrap_or(0),
@@ -88,14 +85,23 @@ pub fn ui(f: &mut Frame, app: &mut App) -> Result<()> {
         f.render_widget(tabs, header_chunks[0]);
     }
     {
-        let tabs = Paragraph::new("q: quit | ?: help | R: refresh | 1/2/3/4: change tab")
-            .fg(Color::DarkGray)
-            .block(
-                Block::bordered()
-                    .title(" lazyjj ")
-                    .border_type(BorderType::Rounded)
-                    .fg(Color::default()),
-            );
+        let tab_keys = app
+            .tab_sequence
+            .iter()
+            .enumerate()
+            .map(|(i, _)| (i + 1).to_string())
+            .collect::<Vec<String>>()
+            .join("/");
+        let tabs = Paragraph::new(format!(
+            "q: quit | ?: help | R: refresh | {tab_keys}: change tab"
+        ))
+        .fg(Color::DarkGray)
+        .block(
+            Block::bordered()
+                .title(" lazyjj ")
+                .border_type(BorderType::Rounded)
+                .fg(Color::default()),
+        );
 
         f.render_widget(tabs, header_chunks[1]);
     }
@@ -106,18 +112,6 @@ pub fn ui(f: &mut Frame, app: &mut App) -> Result<()> {
 
     if let Some(popup) = app.popup.as_mut() {
         popup.draw(f, f.area())?;
-    }
-
-    {
-        let paragraph = Paragraph::new(format!("{}ms", start_time.elapsed().as_millis()))
-            .alignment(Alignment::Right);
-        let position = Rect {
-            x: 0,
-            y: 1,
-            height: 1,
-            width: f.area().width - 1,
-        };
-        f.render_widget(paragraph, position);
     }
 
     Ok(())
