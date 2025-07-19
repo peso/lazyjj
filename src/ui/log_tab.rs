@@ -27,6 +27,7 @@ use crate::{
         details_panel::DetailsPanelEvent,
         help_popup::HelpPopup,
         message_popup::MessagePopup,
+        rebase_popup::RebasePopup,
         utils::{centered_rect, centered_rect_line_height, tabs_to_spaces},
     },
 };
@@ -66,6 +67,8 @@ pub struct LogTab<'a> {
 
     describe_textarea: Option<TextArea<'a>>,
     describe_after_new: bool,
+
+    rebase_popup: Option<RebasePopup>,
 
     squash_ignore_immutable: bool,
 
@@ -154,6 +157,8 @@ impl LogTab<'_> {
 
             describe_textarea: None,
             describe_after_new: false,
+
+            rebase_popup: None,
 
             squash_ignore_immutable: false,
 
@@ -264,6 +269,14 @@ impl LogTab<'_> {
                     .with_listener(Some(self.popup_tx.clone()))
                     .open();
                 self.describe_after_new = describe;
+            }
+            LogTabEvent::Rebase => {
+                let source_change = commander.get_current_head()?.change_id;
+                let target_change = &self.head.change_id;
+                self.rebase_popup = Some(RebasePopup::new(
+                    source_change.clone(),
+                    target_change.clone(),
+                ));
             }
             LogTabEvent::Squash { ignore_immutable } => {
                 if self.head.change_id == commander.get_current_head()?.change_id {
@@ -769,6 +782,13 @@ impl Component for LogTab<'_> {
             }
         }
 
+        // Draw rebase popup
+        {
+            if let Some(log_rebase_popup) = &mut self.rebase_popup {
+                log_rebase_popup.render_widget(f)
+            }
+        }
+
         Ok(())
     }
 
@@ -825,7 +845,20 @@ impl Component for LogTab<'_> {
             return Ok(ComponentInputResult::Handled);
         }
 
-        if let Event::Key(key) = event {
+        if let Some(rebase_popup) = &mut self.rebase_popup {
+            if rebase_popup.handle_input(&mut commander.clone(), event.clone()) {
+                // when handle_input returns true,
+                // the popup should be closed
+                self.rebase_popup = None;
+                return Ok(ComponentInputResult::HandledAction(
+                    ComponentAction::RefreshTab(),
+                ));
+            };
+            return Ok(ComponentInputResult::Handled);
+        }
+
+        if let Event::Key(key) = &event {
+            let key = *key;
             if key.kind != KeyEventKind::Press {
                 return Ok(ComponentInputResult::Handled);
             }
@@ -851,7 +884,7 @@ impl Component for LogTab<'_> {
             return self.handle_event(log_tab_event);
         }
 
-        if let Event::Mouse(mouse_event) = event {
+        if let Event::Mouse(mouse_event) = &event {
             // Determine if mouse event is inside log-view or details-view
             fn contains(rect: &Rect, mouse_event: &MouseEvent) -> bool {
                 rect.x <= mouse_event.column
@@ -861,7 +894,7 @@ impl Component for LogTab<'_> {
             }
             let find_panel = || -> Option<usize> {
                 for (i, rect) in self.panel_rect.iter().enumerate() {
-                    if contains(rect, &mouse_event) {
+                    if contains(rect, mouse_event) {
                         return Some(i);
                     }
                 }
