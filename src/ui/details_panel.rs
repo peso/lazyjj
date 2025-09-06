@@ -162,7 +162,7 @@ impl DetailsPanel {
         }
     }
 
-    pub fn render_context(&mut self) -> DetailsPanelRenderContext {
+    pub fn render_context(&mut self) -> DetailsPanelRenderContext<'_> {
         DetailsPanelRenderContext::new(self)
     }
 

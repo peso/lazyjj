@@ -48,12 +48,12 @@ fn get_current_file_index(
     current_file: Option<&File>,
     files_output: Result<&Vec<File>, &CommandError>,
 ) -> Option<usize> {
-    if let (Some(current_file), Ok(files_output)) = (current_file, files_output) {
-        if let Some(path) = current_file.path.as_ref() {
-            return files_output
-                .iter()
-                .position(|file| file.path.as_ref() == Some(path));
-        }
+    if let (Some(current_file), Ok(files_output)) = (current_file, files_output)
+        && let Some(path) = current_file.path.as_ref()
+    {
+        return files_output
+            .iter()
+            .position(|file| file.path.as_ref() == Some(path));
     }
 
     None
@@ -285,22 +285,22 @@ impl Component for FilesTab {
             f.render_stateful_widget(&files, chunks[0], &mut self.files_list_state);
             self.files_height = chunks[0].height - 2;
 
-            if let Some(index) = current_file_index {
-                if files.len() > self.files_height as usize {
-                    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
-                    let mut scrollbar_state = ScrollbarState::default()
-                        .content_length(files.len())
-                        .position(index);
+            if let Some(index) = current_file_index
+                && files.len() > self.files_height as usize
+            {
+                let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
+                let mut scrollbar_state = ScrollbarState::default()
+                    .content_length(files.len())
+                    .position(index);
 
-                    f.render_stateful_widget(
-                        scrollbar,
-                        chunks[0].inner(Margin {
-                            vertical: 1,
-                            horizontal: 0,
-                        }),
-                        &mut scrollbar_state,
-                    );
-                }
+                f.render_stateful_widget(
+                    scrollbar,
+                    chunks[0].inner(Margin {
+                        vertical: 1,
+                        horizontal: 0,
+                    }),
+                    &mut scrollbar_state,
+                );
             }
         }
 

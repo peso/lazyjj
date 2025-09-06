@@ -272,20 +272,20 @@ impl<'a> App<'a> {
                 }
                 ComponentInputResult::Handled => {}
                 ComponentInputResult::NotHandled => {
-                    if let TermEvent::Key(key) = event {
-                        if key.kind == crossterm::event::KeyEventKind::Press {
-                            // Close
-                            if matches!(
-                                key.code,
-                                KeyCode::Char('y')
-                                    | KeyCode::Char('n')
-                                    | KeyCode::Char('o')
-                                    | KeyCode::Enter
-                                    | KeyCode::Char('q')
-                                    | KeyCode::Esc
-                            ) {
-                                self.popup = None
-                            }
+                    if let TermEvent::Key(key) = event
+                        && key.kind == crossterm::event::KeyEventKind::Press
+                    {
+                        // Close
+                        if matches!(
+                            key.code,
+                            KeyCode::Char('y')
+                                | KeyCode::Char('n')
+                                | KeyCode::Char('o')
+                                | KeyCode::Enter
+                                | KeyCode::Char('q')
+                                | KeyCode::Esc
+                        ) {
+                            self.popup = None
                         }
                     }
                 }
@@ -302,39 +302,38 @@ impl<'a> App<'a> {
                 }
                 ComponentInputResult::Handled => {}
                 ComponentInputResult::NotHandled => {
-                    if let TermEvent::Key(key) = event {
-                        if key.kind == crossterm::event::KeyEventKind::Press {
-                            // Close
-                            if key.code == KeyCode::Char('q')
-                                || (key.modifiers.contains(KeyModifiers::CONTROL)
-                                    && (key.code == KeyCode::Char('c')))
-                                || key.code == KeyCode::Esc
-                            {
-                                return Ok(true);
-                            }
-                            //
-                            // Tab switching
-                            else if key.code == KeyCode::Char('l') {
-                                self.set_next_tab_with_offset(1)?;
-                            } else if key.code == KeyCode::Char('h') {
-                                self.set_next_tab_with_offset(-1)?;
-                            } else if let Some((_, tab)) =
-                                self.tab_sequence.iter().enumerate().find(|(i, _)| {
-                                    key.code
-                                        == KeyCode::Char(
-                                            char::from_digit((*i as u32) + 1u32, 10).expect(
-                                                "Tab index could not be converted to digit",
-                                            ),
-                                        )
-                                })
-                            {
-                                self.set_tab(*tab)?;
-                            }
-                            // General jj command runner
-                            else if key.code == KeyCode::Char(':') {
-                                self.popup = Some(Box::new(CommandPopup::new(
+                    if let TermEvent::Key(key) = event
+                        && key.kind == crossterm::event::KeyEventKind::Press
+                    {
+                        // Close
+                        if key.code == KeyCode::Char('q')
+                            || (key.modifiers.contains(KeyModifiers::CONTROL)
+                                && (key.code == KeyCode::Char('c')))
+                            || key.code == KeyCode::Esc
+                        {
+                            return Ok(true);
+                        }
+                        //
+                        // Tab switching
+                        else if key.code == KeyCode::Char('l') {
+                            self.set_next_tab_with_offset(1)?;
+                        } else if key.code == KeyCode::Char('h') {
+                            self.set_next_tab_with_offset(-1)?;
+                        } else if let Some((_, tab)) =
+                            self.tab_sequence.iter().enumerate().find(|(i, _)| {
+                                key.code
+                                    == KeyCode::Char(
+                                        char::from_digit((*i as u32) + 1u32, 10)
+                                            .expect("Tab index could not be converted to digit"),
+                                    )
+                            })
+                        {
+                            self.set_tab(*tab)?;
+                        }
+                        // General jj command runner
+                        else if key.code == KeyCode::Char(':') {
+                            self.popup = Some(Box::new(CommandPopup::new(
                                     self.commander.clone())));
-                            }
                         }
                     }
                 }

@@ -101,6 +101,11 @@ impl Commander {
             true,
         )?;
 
+        // Extract the log one more time, but this time use a template
+        // where each line begins with Head information. Since jj has
+        // 2 lines per change, there will also be two lines with head info.
+        // The number of lines in graph and the number of items in graph_heads
+        // should be identical.
         let graph_heads: Vec<Option<Head>> = self
             .execute_jj_command(
                 [
@@ -212,7 +217,7 @@ impl Commander {
                         "obslog",
                         "--no-graph",
                         "--template",
-                        r#"change_id ++ "\n""#,
+                        r#"commit.change_id() ++ "\n""#,
                         "-r",
                         latest_head.commit_id.as_str(),
                     ],
