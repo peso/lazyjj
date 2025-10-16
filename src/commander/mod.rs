@@ -105,6 +105,8 @@ pub struct CommandLogItem {
 #[derive(Debug)]
 pub struct Commander {
     pub env: Env,
+    /// Environment variables.
+    pub env_var: Vec<(String, String)>,
     pub command_history: Arc<Mutex<Vec<CommandLogItem>>>,
 
     // Used for testing
@@ -116,6 +118,7 @@ impl Commander {
     pub fn new(env: &Env) -> Self {
         Self {
             env: env.clone(),
+            env_var: vec![],
             command_history: Arc::new(Mutex::new(Vec::new())),
             jj_config_toml: None,
             force_no_color: false,
@@ -186,6 +189,9 @@ impl Commander {
                 command.args(["--config", cfg]);
             }
         }
+
+        // Set environment variables
+        command.envs(self.env_var.iter().cloned());
 
         self.execute_command(&mut command)
     }

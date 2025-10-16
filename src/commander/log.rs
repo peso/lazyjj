@@ -140,10 +140,11 @@ impl Commander {
     /// Maps to `jj show <commit>`
     #[instrument(level = "trace", skip(self))]
     pub fn get_commit_show(
-        &self,
+        &mut self,
         commit_id: &CommitId,
         diff_format: &DiffFormat,
         ignore_working_copy: bool,
+        columns: Option<usize>,
     ) -> Result<String, CommandError> {
         let mut args = vec!["show", commit_id.as_str()];
         args.append(&mut diff_format.get_args());
@@ -151,7 +152,12 @@ impl Commander {
             args.push("--ignore-working-copy");
         }
 
-        Ok(self.execute_jj_command(args, true, true)?.remove_end_line())
+        if let Some(col) = columns {
+            self.env_var.push(("COLUMNS".into(), format!("{col}")));
+        }
+        let result = self.execute_jj_command(args, true, true)?.remove_end_line();
+        self.env_var.clear();
+        Ok(result)
     }
 
     /// Get the current head.
@@ -374,15 +380,18 @@ mod tests {
 
     #[test]
     fn get_commit_show() -> Result<()> {
-        let test_repo = TestRepo::new()?;
+        let mut test_repo = TestRepo::new()?;
 
         fs::write(test_repo.directory.path().join("README"), b"AAA")?;
 
         let head = test_repo.commander.get_current_head()?;
-        let show =
-            test_repo
-                .commander
-                .get_commit_show(&head.commit_id, &DiffFormat::ColorWords, false)?;
+        let columns = None;
+        let show = test_repo.commander.get_commit_show(
+            &head.commit_id,
+            &DiffFormat::ColorWords,
+            false,
+            columns,
+        )?;
 
         let mut settings = insta::Settings::clone_current();
         settings.add_filter(r"Commit ID: [0-9a-fA-F]{40}", "Commit ID: [COMMIT_ID]");

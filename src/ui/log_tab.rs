@@ -81,8 +81,10 @@ impl<'a> LogTab<'a> {
 
         let head = commander.get_current_head()?;
 
+        let ignore_working_copy = true;
+        let columns = None;
         let head_output = commander
-            .get_commit_show(&head.commit_id, &diff_format, true)
+            .get_commit_show(&head.commit_id, &diff_format, ignore_working_copy, columns)
             .map(|text| tabs_to_spaces(&text));
 
         let (popup_tx, popup_rx) = std::sync::mpsc::channel();
@@ -142,8 +144,15 @@ impl<'a> LogTab<'a> {
     }
 
     fn refresh_head_output(&mut self, commander: &mut Commander) {
+        let ignore_working_copy = true;
+        let columns = Some(self.head_panel.columns() as usize).filter(|&c| c > 9);
         self.head_output = commander
-            .get_commit_show(&self.head.commit_id, &self.diff_format, true)
+            .get_commit_show(
+                &self.head.commit_id,
+                &self.diff_format,
+                ignore_working_copy,
+                columns,
+            )
             .map(|text| tabs_to_spaces(&text));
         self.head_panel.scroll_to(0);
     }
