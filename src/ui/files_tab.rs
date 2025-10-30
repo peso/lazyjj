@@ -132,6 +132,9 @@ impl FilesTab {
     }
 
     pub fn refresh_diff(&mut self, commander: &mut Commander) -> Result<()> {
+        let inner_width = self.diff_panel.columns();
+        let var_val = ("COLUMNS".into(), format!("{inner_width}"));
+        commander.env_var.push(var_val);
         self.diff_output = self
             .file
             .as_ref()
@@ -141,6 +144,7 @@ impl FilesTab {
             .map_or(Ok(None), |r| {
                 r.map(|diff| diff.map(|diff| tabs_to_spaces(&diff)))
             });
+        commander.env_var.clear();
         self.diff_panel.scroll_to(0);
         Ok(())
     }
