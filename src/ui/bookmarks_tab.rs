@@ -181,9 +181,6 @@ impl BookmarksTab<'_> {
     }
 
     pub fn refresh_bookmark(&mut self, commander: &mut Commander) {
-        let inner_width = self.bookmark_panel.columns();
-        let var_val = ("COLUMNS".into(), format!("{inner_width}"));
-        commander.env_var.push(var_val);
         self.bookmark_output = self.bookmark.as_ref().and_then(|bookmark| match bookmark {
             BookmarkLine::Parsed { bookmark, .. } => Some(
                 commander
@@ -192,7 +189,6 @@ impl BookmarksTab<'_> {
             ),
             _ => None,
         });
-        commander.env_var.clear();
 
         self.bookmark_panel.scroll_to(0);
     }

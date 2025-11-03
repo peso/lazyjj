@@ -137,26 +137,25 @@ impl Commander {
     }
 
     /// Get commit details.
-    /// Maps to `jj show <commit>`
+    /// Maps to `jj show <revset>`
     #[instrument(level = "trace", skip(self))]
     pub fn get_commit_show(
         &mut self,
-        commit_id: &CommitId,
+        revset: &str,
         diff_format: &DiffFormat,
         ignore_working_copy: bool,
-        columns: Option<usize>,
+        columns: usize,
     ) -> Result<String, CommandError> {
-        let mut args = vec!["show", commit_id.as_str()];
+        let mut args = vec!["show", revset];
         args.append(&mut diff_format.get_args());
         if ignore_working_copy {
             args.push("--ignore-working-copy");
         }
 
-        if let Some(col) = columns {
-            self.env_var.push(("COLUMNS".into(), format!("{col}")));
+        if columns > 9 {
+            self.set_env("COLUMNS", &format!("{columns}"));
         }
         let result = self.execute_jj_command(args, true, true)?.remove_end_line();
-        self.env_var.clear();
         Ok(result)
     }
 
@@ -385,9 +384,9 @@ mod tests {
         fs::write(test_repo.directory.path().join("README"), b"AAA")?;
 
         let head = test_repo.commander.get_current_head()?;
-        let columns = None;
+        let columns = 0;
         let show = test_repo.commander.get_commit_show(
-            &head.commit_id,
+            head.commit_id.as_str(),
             &DiffFormat::ColorWords,
             false,
             columns,
