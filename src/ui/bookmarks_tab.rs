@@ -132,7 +132,7 @@ impl BookmarksTab<'_> {
         let bookmark_output = bookmark.as_ref().and_then(|bookmark| match bookmark {
             BookmarkLine::Parsed { bookmark, .. } => Some(
                 commander
-                    .get_bookmark_show(bookmark, &diff_format, true)
+                    .get_commit_show(&bookmark.name, &diff_format, true, 0)
                     .map(|diff| tabs_to_spaces(&diff)),
             ),
             _ => None,
@@ -181,10 +181,11 @@ impl BookmarksTab<'_> {
     }
 
     pub fn refresh_bookmark(&mut self, commander: &mut Commander) {
+        let inner_width = self.bookmark_panel.columns() as usize;
         self.bookmark_output = self.bookmark.as_ref().and_then(|bookmark| match bookmark {
             BookmarkLine::Parsed { bookmark, .. } => Some(
                 commander
-                    .get_bookmark_show(bookmark, &self.diff_format, true)
+                    .get_commit_show(&bookmark.name, &self.diff_format, true, inner_width)
                     .map(|diff| tabs_to_spaces(&diff)),
             ),
             _ => None,

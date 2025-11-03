@@ -6,10 +6,7 @@ other jj bookmark commands are defined in module [jj][super::jj].
 
 It is mostly used in the [bookmarks_tab][crate::ui::bookmarks_tab] module.
 */
-use crate::{
-    commander::{CommandError, Commander, RemoveEndLine},
-    env::DiffFormat,
-};
+use crate::commander::{CommandError, Commander};
 use ansi_to_tui::IntoText;
 use anyhow::Result;
 use itertools::Itertools;
@@ -179,31 +176,10 @@ impl Commander {
 
         Ok(bookmarks)
     }
-
-    /// Get bookmark details.
-    /// Maps to `jj show <bookmark>`
-    #[instrument(level = "trace", skip(self))]
-    pub fn get_bookmark_show(
-        &self,
-        bookmark: &Bookmark,
-        diff_format: &DiffFormat,
-        ignore_working_copy: bool,
-    ) -> Result<String, CommandError> {
-        let bookmark_arg = &bookmark.to_string();
-        let mut args = vec!["show", bookmark_arg];
-        args.append(&mut diff_format.get_args());
-        if ignore_working_copy {
-            args.push("--ignore-working-copy");
-        }
-
-        Ok(self.execute_jj_command(args, true, true)?.remove_end_line())
-    }
 }
 
 #[cfg(test)]
 mod tests {
-
-    use insta::assert_debug_snapshot;
 
     use crate::commander::tests::TestRepo;
 
@@ -262,27 +238,6 @@ mod tests {
                 timestamp: 0,
             }]
         );
-
-        Ok(())
-    }
-
-    #[test]
-    fn get_bookmark_show() -> Result<()> {
-        let test_repo = TestRepo::new()?;
-
-        let bookmark = test_repo.commander.create_bookmark("test")?;
-        let bookmark_show =
-            test_repo
-                .commander
-                .get_bookmark_show(&bookmark, &DiffFormat::default(), false)?;
-
-        let mut settings = insta::Settings::clone_current();
-        settings.add_filter(r"Commit ID: [0-9a-fA-F]{40}", "Commit ID: [COMMIT_ID]");
-        settings.add_filter(r"Change ID: [k-z]{32}", "Change ID: [Change ID]");
-        settings.add_filter(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", "([DATE_TIME])");
-        let _bound = settings.bind_to_scope();
-
-        assert_debug_snapshot!(bookmark_show);
 
         Ok(())
     }
