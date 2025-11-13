@@ -33,7 +33,10 @@ use ratatui::{
 
 use crate::{
     ComponentInputResult,
-    commander::{Commander, ids::CommitId},
+    commander::{
+        Commander,
+        ids::{ChangeId, CommitId},
+    },
     keybinds::rebase_popup::{CutOption, PasteOption, PopupAction},
     ui::Component,
 };
@@ -44,19 +47,28 @@ type Keybinds = crate::keybinds::rebase_popup::Keybinds;
 pub struct RebasePopup {
     pub keybinds: Keybinds,
 
-    pub source_change: CommitId,
-    pub target_change: CommitId,
+    pub source_rev: CommitId,
+    pub source_change_id: ChangeId,
+    pub target_rev: CommitId,
+    pub target_change_id: ChangeId,
 
     pub source_mode: CutOption,
     pub target_mode: PasteOption,
 }
 
 impl RebasePopup {
-    pub fn new(source_change: CommitId, target_change: CommitId) -> Self {
+    pub fn new(
+        source_change_id: ChangeId,
+        source_rev: CommitId,
+        target_change_id: ChangeId,
+        target_rev: CommitId,
+    ) -> Self {
         Self {
             keybinds: Keybinds::default(),
-            source_change,
-            target_change,
+            source_change_id: source_change_id,
+            source_rev: source_rev,
+            target_change_id: target_change_id,
+            target_rev: target_rev,
             source_mode: CutOption::SingleRevision,
             target_mode: PasteOption::NewBranch,
         }
@@ -68,7 +80,7 @@ impl RebasePopup {
         let area = center_rect(
             frame.area(),
             Size {
-                width: 32,
+                width: 58,
                 height: 12,
             },
         );
@@ -87,8 +99,8 @@ impl RebasePopup {
 
     /// Run the command that the popup is currently configured to do
     fn run_command(&self, commander: &mut Commander) {
-        let src_rev = self.source_change.as_str();
-        let tgt_rev = self.target_change.as_str();
+        let src_rev = self.source_rev.as_str();
+        let tgt_rev = self.target_rev.as_str();
         let src_mode = match self.source_mode {
             CutOption::IncludeDescendants => "-s",
             CutOption::IncludeBranch => "-b",
@@ -153,7 +165,8 @@ impl Component for RebasePopup {
             .split(area);
 
         // Radio buttons for source
-        let src_rev: String = self.source_change.as_str().chars().take(8).collect();
+        let src_change: &str = self.source_change_id.as_str();
+        let src_rev: String = self.source_rev.as_str().chars().take(8).collect();
         let src_options = vec![
             "-s this and descendants",
             "-b whole branch",
@@ -165,13 +178,14 @@ impl Component for RebasePopup {
             CutOption::SingleRevision => 2,
         };
         frame.render_widget(
-            Paragraph::new(Span::raw(format!("Source @ ({src_rev})"))),
+            Paragraph::new(Span::raw(format!("Source @ {src_change} - ({src_rev})"))),
             chunks[0],
         );
         frame.render_stateful_widget(RadioButton::new(src_options), chunks[1], &mut src_select);
 
         // Radio buttons for target
-        let tgt_rev: String = self.target_change.as_str().chars().take(8).collect();
+        let target_change: &str = self.target_change_id.as_str();
+        let tgt_rev: String = self.target_rev.as_str().chars().take(8).collect();
         let tgt_options = vec![
             "-d rebase as new branch",
             "-A rebase after",
@@ -183,7 +197,7 @@ impl Component for RebasePopup {
             PasteOption::InsertBefore => 2,
         };
         frame.render_widget(
-            Paragraph::new(Span::raw(format!("Target ({tgt_rev})"))),
+            Paragraph::new(Span::raw(format!("Target {target_change} - ({tgt_rev})"))),
             chunks[2],
         );
         frame.render_stateful_widget(RadioButton::new(tgt_options), chunks[3], &mut tgt_select);
